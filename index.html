@@ -1,0 +1,295 @@
+<!DOCTYPE HTML>
+<html>
+    <head> 
+      <title>ChatApp</title>
+      <link rel="stylesheet" href="styles/main.css"></link>
+    </head>
+    <body>
+ <table>
+   <tr>
+   <td>
+      <div class = "chat">
+         <input type="text" class="chat-name" placeholder="type your name">
+         <br />
+         <div class="chat-messages">
+           <div class="text-display" align="left">
+           </div>
+         </div>
+         <br />
+         <textarea class="chat-textarea" placeholder="Type Your Message here" required></textarea>
+         <div class="status">Status : <span align="right">Idle</span>
+         <button id="button-id">Camera</button>
+           <button id="snap-button">Take a Pic</button>
+
+          </div>
+            
+      </div>
+  </td>
+  <td>
+             <div align="right" >
+          <video id="v" class="v1" height="240" width="200">
+          </video>
+           <p>
+        <video id="v2"></video>
+           </p>
+
+            
+            
+              
+              <div>
+                <button id="btn-start-recording">Start Recording</button>
+                <button id="btn-stop-recording" disabled="">Stop Recording</button>
+               </div>
+
+            <video id="v3"></video>
+            <video controls>
+             <source type="video/webm" id="source" src="">
+            </video> 
+
+</div>
+</td>
+</tr>
+</table>
+        <script src="https://www.webrtc-experiment.com/RecordRTC.js">
+    </script>
+
+       <script src="http://127.0.0.1:8080/socket.io/socket.io.js"></script>
+       <script>
+          var mediaStream = null;
+          var audioRecorder;
+          var videoRecorder;
+          var image_url1="";
+           var isRecordOnlyAudio = !!navigator.mozGetUserMedia;
+           var btnStartRecording = document.querySelector('#btn-start-recording');
+            var btnStopRecording = document.querySelector('#btn-stop-recording');
+             var videoElement = document.querySelector('#v2');
+
+          (function() {
+             var getNode = function(s) {
+              return document.querySelector(s);
+         },         
+              textarea = getNode('.chat-textarea'),
+              chatName = getNode('.chat-name'),
+              status1 = getNode('.status span'),
+              text = getNode('.chat-messages'),
+              image = getNode('#image-id'),
+              button = getNode('#button-id'),
+              statusDefault = status1.textContent,
+              setStatus = function(s) {
+                status1.textContent = s;
+              if(s!==statusDefault)
+                {
+                  var delay = setTimeout(function() {
+                    setStatus(statusDefault);
+                    clearInterval(delay);
+                   },3000); 
+                }
+              };
+              setStatus("testing");
+         try {
+              var socket = io.connect('http://127.0.0.1:8080');
+             }
+             catch(e){
+              console.log("error:"+e);
+             }
+             if(socket !== undefined) {
+                socket.on('output',function(data){ //output display function//
+                  for(var x=0;x<data.length;x++)
+                   {
+                     var message = document.createElement('div');
+                     var image_tag= document.createElement('img');
+                       //display text and name//
+                 if(data[x].image_url==null||data[x].image_url=="")
+                     {
+                     message.setAttribute('class','text-display');
+                     message.textContent = data[x].name + ':' + data[x].message;
+                     text.appendChild(message);
+                     text.insertBefore(message, text.firstChild);
+                     }
+                    else
+                     {
+                       //display image and user name
+                     image_tag.setAttribute('src',data[x].image_url);
+                     image_tag.style.height = '40px';
+                     image_tag.style.width = '40px';
+                      message.textContent = data[x].name + " : ";
+                     text.appendChild(message);
+                     text.appendChild(image_tag);
+                     text.insertBefore(image_tag, text.firstChild);
+                     text.insertBefore(message, text.firstChild);
+                     
+                     }
+                   }
+                 });
+                socket.on('status',function(data){
+                  setStatus(data.message);
+                  if(data.clear)
+                    textarea.value = "";
+                   
+               })
+             // start web-cam //
+                button.addEventListener('click',function(event) {
+                     run();
+                    //function to take a picture//
+                    var button2 = document.getElementById('snap-button');
+                    button2.addEventListener('click',function(event) {
+                     
+                        image_url1 = snap();
+                       socket.emit('input',{
+                          name : chatName.value,  
+                             message : null,
+                               image_url : image_url1
+                                
+                       });    
+                      });    
+                    });
+                  //enter button in message area sends the text//
+                textarea.addEventListener('keydown',function(event) {
+                   var self = this,  
+                   name = chatName.value;
+                
+                  console.log(event);
+                  if(event.which ===13 && event.shiftKey === false) {
+                     socket.emit('input',{
+                        name : name,
+                         message : self.value,
+                          image_url : null
+                     });
+                      console.log(self.value); 
+                   }
+               });
+             }
+        })(); 
+// function to start webcam//
+function run() {
+console.log("xyz");
+   var v = document.getElementById('v');
+    navigator.getUserMedia = (navigator.getUserMedia ||
+                              navigator.webkitGetUserMedia ||
+                              navigator.mozGetUserMedia ||
+                              navigator.msGetUserMedia);
+   if (navigator.getUserMedia) {
+      // Request access to video only
+       navigator.getUserMedia(
+         {
+            video:true,
+            audio:false
+    
+         },       
+         function(stream) {
+            var url = window.URL || window.webkitURL;
+            v.src = url ? url.createObjectURL(stream) : stream;
+            v.play();
+         },
+            function(error) {
+            alert('Something went wrong. (error code ' + error.code + ')');
+            return;
+         }
+      );
+    console.log("setted up");
+   }
+   else {
+      alert('Sorry, the browser you are using doesn\'t support getUserMedia');
+      return;
+   }  
+}
+//function to capture image//
+function snap()
+ {
+ 
+ 
+  var video = document.querySelector(".v1");
+  var canvas = document.createElement('canvas');
+  canvas.width = 240;
+  canvas.height = 240;
+  canvas.getContext("2d").drawImage(video,0,0,canvas.width,canvas.height);
+  var datauri = canvas.toDataURL('image/jpeg');
+  
+  return datauri;
+    
+ }
+
+// video recording try....video is recorded(shown on console) not able to send//
+function onStopRecording() {
+   var vid_i = document.getElementById("v3");
+   var source = document.getElementById("source");
+        audioRecorder.getDataURL(function(audioDataURL) {
+            var audio = {
+                blob: audioRecorder.getBlob(),
+                dataURL: audioDataURL
+            };
+            // if record both wav and webm
+            if (!isRecordOnlyAudio) {
+                videoRecorder.getDataURL(function(videoDataURL) {
+                    var video = {
+                        blob: videoRecorder.getBlob(),
+                        dataURL: videoDataURL
+                    };
+                 console.log(videoDataURL);  
+                 source.setAttribute('src',videoDataURL);//problem with link//
+                });
+             vid_i.setAttribute('src',videoRecorder.toURL());
+              console.log(videoRecorder.toURL());
+            }
+        });
+    }
+ function captureUserMedia(success_callback) {
+        var session = {
+            audio: true,
+            video: true
+        };
+        navigator.getUserMedia(session, success_callback, function(error) {
+            alert(JSON.stringify(error));
+        });
+    }
+  btnStartRecording.onclick = function() {
+        btnStartRecording.disabled = true;
+        captureUserMedia(function(stream) {
+            mediaStream = stream;
+            videoElement.src = window.URL.createObjectURL(stream);
+            videoElement.play();
+            videoElement.muted = true;
+            videoElement.controls = false;
+            // it is second parameter of the RecordRTC
+            var audioConfig = {};
+            if (!isRecordOnlyAudio) {
+                audioConfig.onAudioProcessStarted = function() {
+                    // invoke video recorder in this callback
+                    // to get maximum sync
+                    videoRecorder.startRecording();
+                };
+            }
+            audioRecorder = RecordRTC(stream, audioConfig);
+            if (!isRecordOnlyAudio) {
+                // it is second parameter of the RecordRTC
+                var videoConfig = {
+                    type: 'video'
+                };
+                videoRecorder = RecordRTC(stream, videoConfig);
+            }
+            audioRecorder.startRecording();
+            // enable stop-recording button
+            btnStopRecording.disabled = false;
+        });
+    };
+    btnStopRecording.onclick = function() {
+        btnStartRecording.disabled = false;
+        btnStopRecording.disabled = true;
+        if (isRecordOnlyAudio) {
+            audioRecorder.stopRecording(onStopRecording);
+        }
+         if (!isRecordOnlyAudio) {
+            audioRecorder.stopRecording(function() {
+                videoRecorder.stopRecording(function() {
+                    onStopRecording();
+                });
+            });
+        }
+    };
+
+
+       </script>
+       <script src="https://cdn.webrtc-experiment.com/DataChannel.js"> </script>
+    </body>
+</html>
+
